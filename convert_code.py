@@ -11,7 +11,7 @@
 # all imports are here
 from scipy.io import wavfile
 import numpy as np
-import matplotlib.pyplot as pl
+import matplotlib.pyplot as plt
 
 class MainNotesExtractor():
   def __init__(self, path_to_file, voices):
@@ -28,12 +28,15 @@ class MainNotesExtractor():
   def get_top_freq_per_seg(self):
     spectrum, freqs, t, im = plt.specgram(self.data, Fs = self.rate, NFFT = 4096)
     # plot the spectrogram
+
+    '''
     plt.colorbar()
     plt.ylim([self.lowerFreq, self.upperFreq])
     plt.title("Spectrogram of Audio File Within Frequencies of Interest")
     plt.xlabel('Time(s)')
     plt.ylabel('Frequency (Hz)')
     plt.show()
+    '''
 
     # find the frequency limits
     ind_boundary = (None, None)
@@ -63,19 +66,23 @@ class MainNotesExtractor():
 
     # plot the max frequency graph over time
     max_freq = np.array(max_freq)
+    '''
     plt.scatter(t, max_freq)
     plt.xlabel("Time (s)")
     plt.ylabel("Frequency (Hz)")
     plt.title("Most Prominent Frequency over Time")
     plt.show()
+    '''
     # plot the magnitude of the max frequency graph
     max_magn = np.array(max_magn)
+    '''
     plt.xlabel("Time (s)")
     plt.ylabel("Magnitude")
     plt.title("Magnitude of Most Prominent Frequency over Time")
     plt.yscale('log')
     plt.scatter(t, max_magn)
     plt.show()
+    '''
     return max_freq, max_magn, t
 
   def clean_frequencies(freqs, magn):
@@ -87,31 +94,35 @@ class MainNotesExtractor():
   def extract(self):
     # generate and extract data from spectrogram
     freqs, magn, time = self.get_top_freq_per_seg()
+    return freqs, magn, time
     # get rid of the noise (frequencies with small magnitude in fft)
 
 
 class FrequencyToCode():
-  def __init__(self, data):
-    self.data = data
+  def __init__(self, freqs, time):
+    self.freqs = freqs
+    self.time = time
 
   def getCode(self):
     template = "#ifndef DATA_H\n#define DATA_H\nint FREQUENCIES[]=^{}$;\n"
-    template += "int DURATION[]=^{}$;\n#endif"
+    template += "int DURATION[]=^{}$;\n#endif\n"
 
-    frequencies = str([i[0] for i in self.data])[1:-1]
-    duration = str([i[1] for i in self.data])[1:-1]
+    frequencies = str([int(i) for i in self.freqs])[1:-1]
+    duration = str([int(i) for i in self.time])[1:-1]
 
     code = template.format(frequencies, duration)
     code = code.replace('^', '{').replace('$','}')
     return code
 
   def writeCode(self):
-    f = open('data.h', 'w+')
+    f = open('musicplayer/data.h', 'w+')
     f.write(self.getCode())
     f.close()
 
-
-print("helllo")
-path = "/content/drive/MyDrive/Lab 6/Group 3/Final Project Test Audios/test5.wav"
+######################################################
+path = "./audio/test5.wav"
 extractor = MainNotesExtractor(path, 1)
-extractor.extract()
+freqs, magn, time = extractor.extract()
+encoder = FrequencyToCode(freqs, time)
+encoder.writeCode();
+
