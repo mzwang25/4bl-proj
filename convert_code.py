@@ -15,10 +15,12 @@ import os
 #   rate: data rate of the audio file
 #   data: the raw data of the audio file
 #   graph_path: the path storing the graphs generated
+#   lowerFreq: lowest frequency (131Hz, C3)
+#   upperFreq: three octaves above lowerFreq (C6)
 # TODO: in the case of multiple voices, how do we synchronise the motors
 class MainNotesExtractor():
   def __init__(self, path_to_file, voices):
-    self.lowerFreq = 300
+    self.lowerFreq = 131
     self.upperFreq = self.lowerFreq * 8 # three octaves
     #self.upperFreq = 300+300
     file_name = MainNotesExtractor.path_leaf(path_to_file)
@@ -36,6 +38,7 @@ class MainNotesExtractor():
     head, tail = ntpath.split(path)
     return tail or ntpath.basename(head)
 
+  # save whatever plot we have on plt at self.graph_path with name.png
   def save_plot_with_name(self, name):
     plt.savefig(self.graph_path.format(self.file, name))
 
@@ -69,12 +72,6 @@ class MainNotesExtractor():
       seg = trimmed_spectrum[:,i]
       max_ind = np.argmax(seg)
       max_val = seg[max_ind]
-
-      if(max_val < 5000):
-        max_freq.append(0)
-        max_magn.append(0)
-        continue
-
       max_freq.append(trimmed_freqs[max_ind])
       max_magn.append(max_val)
 
@@ -84,9 +81,9 @@ class MainNotesExtractor():
     plt.xlabel("Time (s)")
     plt.ylabel("Frequency (Hz)")
     plt.title("Most Prominent Frequency over Time")
+    plt.ylim([0, self.upperFreq])
     self.save_plot_with_name("raw_freq_over_time")
     plt.show()
-    #plt.savefig("./graphs/{}-graphs/raw_freq_over_time.png".format(self.file))
     
     # plot the magnitude of the max frequency graph
     max_magn = np.array(max_magn)
@@ -94,21 +91,50 @@ class MainNotesExtractor():
     plt.ylabel("Magnitude")
     plt.title("Magnitude of Most Prominent Frequency over Time")
     plt.yscale('log')
-    plt.scatter(t, max_magn)
+#    plt.ylim(bottom=10**-3)
+    plt.scatter(t, np.ma.masked_equal(max_magn, 0)) # mask all 0 magnitude values
     self.save_plot_with_name("raw_magn_over_time")
     plt.show()
-    #plt.savefig("./graphs/{}-graphs/raw_magn_over_time.png".format(self.file))
     return max_freq, max_magn, t
 
-  def clean_frequencies(freqs, magn):
+  # takes in the raw freqs and magn and then clean them (get rid of noise)
+  # and maybe do some clustering (group similar notes together)
+  # time is passed in for plotting
+  def clean_frequencies(self, freqs, magn, time):
     # get the magnitude of the most prominent signal
-    pass
+    # get the mean log_10 magnitude for all non-zero magnitudes
+    mean_log_10_magnitude = np.mean(np.log10(magn[magn != 0]))
+    print(mean_log_10_magnitude)
+    # magic cutoff threshold
+    # all frequency whose log_10 fft magnitude < mean_log_10_magnitude + magic_cutoff is omitted
+    magic_cutoff = -1
+    filtered_freqs = np.array([freqs[ind] if val != 0 and np.log10(val)-mean_log_10_magnitude > magic_cutoff else 0 for ind, val in np.ndenumerate(magn)])
+    filtered_magn = np.array([magn[ind] if val > 0 else 0 for ind, val in np.ndenumerate(filtered_freqs)])
+    # plot the filtered frequencies
+    plt.scatter(time, filtered_freqs)
+    plt.title("Most Prominent Frequency over time Filtered with Avg Log Magnitude")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Frequency (Hz)")
+    plt.ylim([0, self.upperFreq])
+    self.save_plot_with_name("freq_over_time_avg_magn_filtered")
+    plt.show()
+    # plot the magnitude of the filtered frequencies
+    plt.scatter(time, np.ma.masked_equal(filtered_magn, 0))
+    plt.title("Magnitude of Prominent Frequency over time Filtered with Avg Log Magnitude")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Magnitude")
+    plt.yscale('log')
+    #plt.ylim(bottom= 10**-3)
+    self.save_plot_with_name("magn_over_time_avg_magn_filtered")
+    plt.show()
+    return filtered_freqs, filtered_magn
 
   # output the audio file in the following format:
   # [(note_freq, duration_in_ms)]
   def extract(self):
     # generate and extract data from spectrogram
     freqs, magn, time = self.get_top_freq_per_seg()
+    filtered_freqs, filtered_magn = self.clean_frequencies(freqs, magn, time)
     return freqs, magn, time
     # get rid of the noise (frequencies with small magnitude in fft)
 
