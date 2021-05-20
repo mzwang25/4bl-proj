@@ -56,7 +56,7 @@ class MainNotesExtractor():
       max_ind = np.argmax(seg)
       max_val = seg[max_ind]
 
-      if(max_val < 300000):
+      if(max_val < 5000):
         max_freq.append(0)
         max_magn.append(0)
         continue
@@ -105,12 +105,13 @@ class FrequencyToCode():
 
   def getCode(self):
     template = "#ifndef DATA_H\n#define DATA_H\nint FREQUENCIES[]=^{}$;\n"
-    template += "int DURATION[]=^{}$;\n#endif\n"
+    template += "float DURATION[]=^{}$;\nint LENGTH={};\n#endif\n"
 
-    frequencies = str([int(i) for i in self.freqs])[1:-1]
+    frequencies = str([float(i) for i in self.freqs])[1:-1]
     duration = str([int(i) for i in self.time])[1:-1]
+    duration = "0"
 
-    code = template.format(frequencies, duration)
+    code = template.format(frequencies, duration, len(frequencies))
     code = code.replace('^', '{').replace('$','}')
     return code
 

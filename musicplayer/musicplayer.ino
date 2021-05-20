@@ -1,5 +1,6 @@
 //Includes the Arduino Stepper Library
 #include <Stepper.h>
+#include "data.h"
  
 // Defines the number of steps per rotation
 const int stepsPerRevolution = 264;
@@ -20,23 +21,23 @@ int getSpeed(int Hz){
 int getStep(int motorSpeed, double duration){
   return round((double)motorSpeed*stepsPerRevolution*duration/60);
 }
- 
+
+int counter = 0;
+
 void loop() {
-  int currentHz = 440;
-  const double halfNoteRatio = 1.05946309436;
-  // go from 440 to 1760 Hz, one per each half note, each lasting 1 sec
-  for (int i = 0; i < 48; i++){
-      int speed = getSpeed(currentHz);
-      int steps = getStep(speed, 1);
-      Serial.print("Freq:: ");
-      Serial.print(currentHz);
-      Serial.print("\tspeed:: ");
-      Serial.print(speed);
-      Serial.print("\tsteps:: ");
-      Serial.println(steps);
-      myStepper.setSpeed(speed);
-      myStepper.step(steps);
-      delay(1000);
-      currentHz = round(halfNoteRatio*currentHz);
+  if(counter >= LENGTH)
+    counter = 0;
+    
+  int currentHz = FREQUENCIES[counter++];
+  Serial.println(currentHz);
+  
+  if(currentHz != 0) {  
+    const double halfNoteRatio = 1.05946309436;
+    // go from 440 to 1760 Hz, one per each half note, each lasting 1 sec
+    int speed = getSpeed(currentHz);
+    int steps = getStep(speed, 0.1);
+    myStepper.setSpeed(speed);
+    myStepper.step(steps);
   }
+
 }
