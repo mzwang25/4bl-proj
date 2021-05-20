@@ -1,42 +1,56 @@
 #!/usr/bin/python3
 
-# class used to extract the main notes out of the melody
-# instance variables:
-#   file: string containing the path to the audio file being compressed
-#   voices: int containing the number of voices.
-#   rate: data rate of the audio file
-#   data: the raw data of the audio file
-# TODO: in the case of multiple voices, how do we synchronise the motors
 
 # all imports are here
 from scipy.io import wavfile
 import numpy as np
 import matplotlib.pyplot as plt
+import ntpath
+import os
 
+# class used to extract the main notes out of the melody
+# instance variables:
+#   file: string containing the audio file's name without extension
+#   voices: int containing the number of voices.
+#   rate: data rate of the audio file
+#   data: the raw data of the audio file
+#   graph_path: the path storing the graphs generated
+# TODO: in the case of multiple voices, how do we synchronise the motors
 class MainNotesExtractor():
   def __init__(self, path_to_file, voices):
     self.lowerFreq = 300
     self.upperFreq = self.lowerFreq * 8 # three octaves
     #self.upperFreq = 300+300
-    self.file = path_to_file
+    file_name = MainNotesExtractor.path_leaf(path_to_file)
+    self.file = os.path.splitext(file_name)[0]
     self.voices = voices
-    self.rate, self.data = wavfile.read(self.file)
+    self.rate, self.data = wavfile.read(path_to_file)
     if len(self.data.shape) == 2:
       self.data = self.data[:,0]
+    # make a directory to save the graphs in
+    os.makedirs(os.path.abspath("./graphs/{}-graphs".format(self.file)), exist_ok= True)
+    self.graph_path = os.path.abspath("./graphs/{}-graphs/{}.png")
+    
+  # courtesy of stackoverflow
+  def path_leaf(path):
+    head, tail = ntpath.split(path)
+    return tail or ntpath.basename(head)
+
+  def save_plot_with_name(self, name):
+    plt.savefig(self.graph_path.format(self.file, name))
 
   # returns the top frequency at each time from the spectrogram and their magnitude
   def get_top_freq_per_seg(self):
     spectrum, freqs, t, im = plt.specgram(self.data, Fs = self.rate, NFFT = 4096)
-    # plot the spectrogram
 
-    '''
+    # plot the spectrogram
     plt.colorbar()
     plt.ylim([self.lowerFreq, self.upperFreq])
     plt.title("Spectrogram of Audio File Within Frequencies of Interest")
     plt.xlabel('Time(s)')
     plt.ylabel('Frequency (Hz)')
+    self.save_plot_with_name("spectrogram")
     plt.show()
-    '''
 
     # find the frequency limits
     ind_boundary = (None, None)
@@ -66,23 +80,24 @@ class MainNotesExtractor():
 
     # plot the max frequency graph over time
     max_freq = np.array(max_freq)
-    '''
     plt.scatter(t, max_freq)
     plt.xlabel("Time (s)")
     plt.ylabel("Frequency (Hz)")
     plt.title("Most Prominent Frequency over Time")
+    self.save_plot_with_name("raw_freq_over_time")
     plt.show()
-    '''
+    #plt.savefig("./graphs/{}-graphs/raw_freq_over_time.png".format(self.file))
+    
     # plot the magnitude of the max frequency graph
     max_magn = np.array(max_magn)
-    '''
     plt.xlabel("Time (s)")
     plt.ylabel("Magnitude")
     plt.title("Magnitude of Most Prominent Frequency over Time")
     plt.yscale('log')
     plt.scatter(t, max_magn)
+    self.save_plot_with_name("raw_magn_over_time")
     plt.show()
-    '''
+    #plt.savefig("./graphs/{}-graphs/raw_magn_over_time.png".format(self.file))
     return max_freq, max_magn, t
 
   def clean_frequencies(freqs, magn):
@@ -121,9 +136,8 @@ class FrequencyToCode():
     f.close()
 
 ######################################################
-path = "./audio/test5.wav"
+path = os.path.abspath("./audio/test5.wav")
 extractor = MainNotesExtractor(path, 1)
 freqs, magn, time = extractor.extract()
 encoder = FrequencyToCode(freqs, time)
-encoder.writeCode();
-
+encoder.writeCode()
