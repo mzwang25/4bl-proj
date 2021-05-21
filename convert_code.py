@@ -44,7 +44,7 @@ class MainNotesExtractor():
 
   # returns the top frequency at each time from the spectrogram and their magnitude
   def get_top_freq_per_seg(self):
-    spectrum, freqs, t, im = plt.specgram(self.data, Fs = self.rate, NFFT = 4096)
+    spectrum, freqs, t, im = plt.specgram(self.data, Fs = self.rate, NFFT = 3000)
 
     # plot the spectrogram
     plt.colorbar()
@@ -53,7 +53,7 @@ class MainNotesExtractor():
     plt.xlabel('Time(s)')
     plt.ylabel('Frequency (Hz)')
     self.save_plot_with_name("spectrogram")
-    plt.show()
+    #plt.show()
 
     # find the frequency limits
     ind_boundary = (None, None)
@@ -83,7 +83,7 @@ class MainNotesExtractor():
     plt.title("Most Prominent Frequency over Time")
     plt.ylim([0, self.upperFreq])
     self.save_plot_with_name("raw_freq_over_time")
-    plt.show()
+    #plt.show()
     
     # plot the magnitude of the max frequency graph
     max_magn = np.array(max_magn)
@@ -94,7 +94,7 @@ class MainNotesExtractor():
 #    plt.ylim(bottom=10**-3)
     plt.scatter(t, np.ma.masked_equal(max_magn, 0)) # mask all 0 magnitude values
     self.save_plot_with_name("raw_magn_over_time")
-    plt.show()
+    #plt.show()
     return max_freq, max_magn, t
 
   # takes in the raw freqs and magn and then clean them (get rid of noise)
@@ -117,7 +117,7 @@ class MainNotesExtractor():
     plt.ylabel("Frequency (Hz)")
     plt.ylim([0, self.upperFreq])
     self.save_plot_with_name("freq_over_time_avg_magn_filtered")
-    plt.show()
+    #plt.show()
     # plot the magnitude of the filtered frequencies
     plt.scatter(time, np.ma.masked_equal(filtered_magn, 0))
     plt.title("Magnitude of Prominent Frequency over time Filtered with Avg Log Magnitude")
@@ -126,8 +126,9 @@ class MainNotesExtractor():
     plt.yscale('log')
     #plt.ylim(bottom= 10**-3)
     self.save_plot_with_name("magn_over_time_avg_magn_filtered")
-    plt.show()
+    #plt.show()
     return filtered_freqs, filtered_magn
+
 
   # output the audio file in the following format:
   # [(note_freq, duration_in_ms)]
@@ -135,7 +136,8 @@ class MainNotesExtractor():
     # generate and extract data from spectrogram
     freqs, magn, time = self.get_top_freq_per_seg()
     filtered_freqs, filtered_magn = self.clean_frequencies(freqs, magn, time)
-    return freqs, magn, time
+    #self.movingAverage(filtered_freqs)
+    return filtered_freqs, filtered_magn, time
     # get rid of the noise (frequencies with small magnitude in fft)
 
 
@@ -152,6 +154,9 @@ class FrequencyToCode():
     duration = str([int(i) for i in self.time])[1:-1]
     duration = "0"
 
+    if(len(frequencies) > 8000):
+      frequencies = frequencies[0:8000]
+
     code = template.format(frequencies, duration, len(frequencies))
     code = code.replace('^', '{').replace('$','}')
     return code
@@ -162,8 +167,9 @@ class FrequencyToCode():
     f.close()
 
 ######################################################
-path = os.path.abspath("./audio/test5.wav")
+path = os.path.abspath("./audio/test4.wav")
 extractor = MainNotesExtractor(path, 1)
 freqs, magn, time = extractor.extract()
 encoder = FrequencyToCode(freqs, time)
 encoder.writeCode()
+

@@ -3,7 +3,7 @@
 #include "data.h"
  
 // Defines the number of steps per rotation
-const int stepsPerRevolution = 264;
+const int stepsPerRevolution = 512;
  
 // Creates an instance of stepper class
 // Pins entered in sequence IN1-IN3-IN2-IN4 for proper step sequence
@@ -35,7 +35,7 @@ void loop() {
     const double halfNoteRatio = 1.05946309436;
     // go from 440 to 1760 Hz, one per each half note, each lasting 1 sec
     int speed = getSpeed(currentHz);
-    int steps = getStep(speed, 0.1);
+    int steps = getStep(speed, 0.07);
     myStepper.setSpeed(speed);
     myStepper.step(steps);
   }
