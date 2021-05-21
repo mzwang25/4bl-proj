@@ -1,8 +1,18 @@
 #!/usr/bin/python3
 
+'''
+Usage: convert_code.py [options]
+
+Options:
+  -h, --help            show this help message and exit
+  -p, --plot            create plots under /graphs
+  -f AUDIOFILE, --file=AUDIOFILE
+                        path to wav file
+'''
 
 # all imports are here
 from scipy.io import wavfile
+from optparse import OptionParser
 import numpy as np
 import matplotlib.pyplot as plt
 import ntpath
@@ -47,13 +57,14 @@ class MainNotesExtractor():
     spectrum, freqs, t, im = plt.specgram(self.data, Fs = self.rate, NFFT = 3000)
 
     # plot the spectrogram
-    plt.colorbar()
-    plt.ylim([self.lowerFreq, self.upperFreq])
-    plt.title("Spectrogram of Audio File Within Frequencies of Interest")
-    plt.xlabel('Time(s)')
-    plt.ylabel('Frequency (Hz)')
-    self.save_plot_with_name("spectrogram")
-    #plt.show()
+    if(options.plot):
+      plt.colorbar()
+      plt.ylim([self.lowerFreq, self.upperFreq])
+      plt.title("Spectrogram of Audio File Within Frequencies of Interest")
+      plt.xlabel('Time(s)')
+      plt.ylabel('Frequency (Hz)')
+      self.save_plot_with_name("spectrogram")
+      plt.show()
 
     # find the frequency limits
     ind_boundary = (None, None)
@@ -77,24 +88,27 @@ class MainNotesExtractor():
 
     # plot the max frequency graph over time
     max_freq = np.array(max_freq)
-    plt.scatter(t, max_freq)
-    plt.xlabel("Time (s)")
-    plt.ylabel("Frequency (Hz)")
-    plt.title("Most Prominent Frequency over Time")
-    plt.ylim([0, self.upperFreq])
-    self.save_plot_with_name("raw_freq_over_time")
-    #plt.show()
+
+    if(options.plot):
+      plt.scatter(t, max_freq)
+      plt.xlabel("Time (s)")
+      plt.ylabel("Frequency (Hz)")
+      plt.title("Most Prominent Frequency over Time")
+      plt.ylim([0, self.upperFreq])
+      self.save_plot_with_name("raw_freq_over_time")
+      plt.show()
     
     # plot the magnitude of the max frequency graph
     max_magn = np.array(max_magn)
-    plt.xlabel("Time (s)")
-    plt.ylabel("Magnitude")
-    plt.title("Magnitude of Most Prominent Frequency over Time")
-    plt.yscale('log')
-#    plt.ylim(bottom=10**-3)
-    plt.scatter(t, np.ma.masked_equal(max_magn, 0)) # mask all 0 magnitude values
-    self.save_plot_with_name("raw_magn_over_time")
-    #plt.show()
+
+    if(options.plot):
+      plt.xlabel("Time (s)")
+      plt.ylabel("Magnitude")
+      plt.title("Magnitude of Most Prominent Frequency over Time")
+      plt.yscale('log')
+      plt.scatter(t, np.ma.masked_equal(max_magn, 0)) # mask all 0 magnitude values
+      self.save_plot_with_name("raw_magn_over_time")
+      #plt.show()
     return max_freq, max_magn, t
 
   # takes in the raw freqs and magn and then clean them (get rid of noise)
@@ -104,29 +118,31 @@ class MainNotesExtractor():
     # get the magnitude of the most prominent signal
     # get the mean log_10 magnitude for all non-zero magnitudes
     mean_log_10_magnitude = np.mean(np.log10(magn[magn != 0]))
-    print(mean_log_10_magnitude)
+    #print(mean_log_10_magnitude)
     # magic cutoff threshold
     # all frequency whose log_10 fft magnitude < mean_log_10_magnitude + magic_cutoff is omitted
     magic_cutoff = -1
     filtered_freqs = np.array([freqs[ind] if val != 0 and np.log10(val)-mean_log_10_magnitude > magic_cutoff else 0 for ind, val in np.ndenumerate(magn)])
     filtered_magn = np.array([magn[ind] if val > 0 else 0 for ind, val in np.ndenumerate(filtered_freqs)])
-    # plot the filtered frequencies
-    plt.scatter(time, filtered_freqs)
-    plt.title("Most Prominent Frequency over time Filtered with Avg Log Magnitude")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Frequency (Hz)")
-    plt.ylim([0, self.upperFreq])
-    self.save_plot_with_name("freq_over_time_avg_magn_filtered")
-    #plt.show()
-    # plot the magnitude of the filtered frequencies
-    plt.scatter(time, np.ma.masked_equal(filtered_magn, 0))
-    plt.title("Magnitude of Prominent Frequency over time Filtered with Avg Log Magnitude")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Magnitude")
-    plt.yscale('log')
-    #plt.ylim(bottom= 10**-3)
-    self.save_plot_with_name("magn_over_time_avg_magn_filtered")
-    #plt.show()
+
+    if(options.plot):
+      # plot the filtered frequencies
+      plt.scatter(time, filtered_freqs)
+      plt.title("Most Prominent Frequency over time Filtered with Avg Log Magnitude")
+      plt.xlabel("Time (s)")
+      plt.ylabel("Frequency (Hz)")
+      plt.ylim([0, self.upperFreq])
+      self.save_plot_with_name("freq_over_time_avg_magn_filtered")
+      #plt.show()
+      # plot the magnitude of the filtered frequencies
+      plt.scatter(time, np.ma.masked_equal(filtered_magn, 0))
+      plt.title("Magnitude of Prominent Frequency over time Filtered with Avg Log Magnitude")
+      plt.xlabel("Time (s)")
+      plt.ylabel("Magnitude")
+      plt.yscale('log')
+      #plt.ylim(bottom= 10**-3)
+      self.save_plot_with_name("magn_over_time_avg_magn_filtered")
+      #plt.show()
     return filtered_freqs, filtered_magn
 
 
@@ -167,9 +183,29 @@ class FrequencyToCode():
     f.close()
 
 ######################################################
+'''
 path = os.path.abspath("./audio/test4.wav")
 extractor = MainNotesExtractor(path, 1)
 freqs, magn, time = extractor.extract()
 encoder = FrequencyToCode(freqs, time)
 encoder.writeCode()
+'''
+
+parser = OptionParser()
+parser.add_option("-p", "--plot", dest="plot", action="store_true",
+                  help="create plots under /graphs", metavar="GRAPHS", default=False)
+parser.add_option("-f", "--file",
+                  dest="audiofile", default="./audio/test4.wav",
+                  help="path to wav file")
+
+(options, _) = parser.parse_args()
+fname = options.audiofile
+path = os.path.abspath(fname)
+extractor = MainNotesExtractor(path, 1)
+freqs, magn, time = extractor.extract()
+encoder = FrequencyToCode(freqs, time)
+encoder.writeCode()
+
+
+
 
