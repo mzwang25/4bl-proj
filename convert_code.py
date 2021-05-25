@@ -21,15 +21,16 @@ import os
 # class used to extract the main notes out of the melody
 # instance variables:
 #   file: string containing the audio file's name without extension
-#   voices: int containing the number of voices.
+#   voices: int containing the number of voices. TODO: incomplete
 #   rate: data rate of the audio file
 #   data: the raw data of the audio file
 #   graph_path: the path storing the graphs generated
 #   lowerFreq: lowest frequency (131Hz, C3)
 #   upperFreq: three octaves above lowerFreq (C6)
+#   plot: whether we are generating the graphs for the music file
 # TODO: in the case of multiple voices, how do we synchronise the motors
 class MainNotesExtractor():
-  def __init__(self, path_to_file, voices):
+  def __init__(self, path_to_file, voices, generate_plot):
     self.lowerFreq = 131
     self.upperFreq = self.lowerFreq * 8 # three octaves
     #self.upperFreq = 300+300
@@ -37,6 +38,7 @@ class MainNotesExtractor():
     self.file = os.path.splitext(file_name)[0]
     self.voices = voices
     self.rate, self.data = wavfile.read(path_to_file)
+    self.plot = generate_plot
     if len(self.data.shape) == 2:
       self.data = self.data[:,0]
     # make a directory to save the graphs in
@@ -57,14 +59,14 @@ class MainNotesExtractor():
     spectrum, freqs, t, im = plt.specgram(self.data, Fs = self.rate, NFFT = 3000)
 
     # plot the spectrogram
-    if(options.plot):
+    if(self.plot):
       plt.colorbar()
       plt.ylim([self.lowerFreq, self.upperFreq])
       plt.title("Spectrogram of Audio File Within Frequencies of Interest")
       plt.xlabel('Time(s)')
       plt.ylabel('Frequency (Hz)')
       self.save_plot_with_name("spectrogram")
-      plt.show()
+      plt.clf()
 
     # find the frequency limits
     ind_boundary = (None, None)
@@ -89,25 +91,27 @@ class MainNotesExtractor():
     # plot the max frequency graph over time
     max_freq = np.array(max_freq)
 
-    if(options.plot):
+    if(self.plot):
       plt.scatter(t, max_freq)
       plt.xlabel("Time (s)")
       plt.ylabel("Frequency (Hz)")
       plt.title("Most Prominent Frequency over Time")
       plt.ylim([0, self.upperFreq])
       self.save_plot_with_name("raw_freq_over_time")
-      plt.show()
+      plt.clf()
+      #plt.show()
     
     # plot the magnitude of the max frequency graph
     max_magn = np.array(max_magn)
 
-    if(options.plot):
+    if(self.plot):
       plt.xlabel("Time (s)")
       plt.ylabel("Magnitude")
       plt.title("Magnitude of Most Prominent Frequency over Time")
       plt.yscale('log')
       plt.scatter(t, np.ma.masked_equal(max_magn, 0)) # mask all 0 magnitude values
       self.save_plot_with_name("raw_magn_over_time")
+      plt.clf()
       #plt.show()
     return max_freq, max_magn, t
 
@@ -125,7 +129,7 @@ class MainNotesExtractor():
     filtered_freqs = np.array([freqs[ind] if val != 0 and np.log10(val)-mean_log_10_magnitude > magic_cutoff else 0 for ind, val in np.ndenumerate(magn)])
     filtered_magn = np.array([magn[ind] if val > 0 else 0 for ind, val in np.ndenumerate(filtered_freqs)])
 
-    if(options.plot):
+    if(self.plot):
       # plot the filtered frequencies
       plt.scatter(time, filtered_freqs)
       plt.title("Most Prominent Frequency over time Filtered with Avg Log Magnitude")
@@ -133,6 +137,7 @@ class MainNotesExtractor():
       plt.ylabel("Frequency (Hz)")
       plt.ylim([0, self.upperFreq])
       self.save_plot_with_name("freq_over_time_avg_magn_filtered")
+      plt.clf()
       #plt.show()
       # plot the magnitude of the filtered frequencies
       plt.scatter(time, np.ma.masked_equal(filtered_magn, 0))
@@ -142,8 +147,71 @@ class MainNotesExtractor():
       plt.yscale('log')
       #plt.ylim(bottom= 10**-3)
       self.save_plot_with_name("magn_over_time_avg_magn_filtered")
+      plt.clf()
       #plt.show()
-    return filtered_freqs, filtered_magn
+
+    # try to do some clustering
+    # go through the frequency lists and group them together
+    prev_freq = None
+    freq_groups = [] # will hold tuples in the form of (number_of_recurrence, frequency)
+    counter = None
+    for ind, val in enumerate(filtered_freqs):
+      if prev_freq == None and counter == None: #first run
+        prev_freq = val
+        counter = 1
+        continue
+      if val != prev_freq:
+        freq_groups.append((counter, prev_freq))
+        prev_freq = val
+        counter = 1
+      else:
+        counter += 1
+    if prev_freq != freq_groups[-1][1]:
+      freq_groups.append((counter, prev_freq))
+
+    # go through the groups, if there are outliers that last too short, group them to nearby notes, or zero them
+    half_note_ratio = 1.05946309436
+    magic_clustering_cutoff = 2
+    freq_clusters = [] # same format as freq_groups
+    for ind, val in enumerate(freq_groups):
+      recurrence, freq = val
+      if recurrence <= magic_clustering_cutoff:
+        left_neighbor_freq = freq_groups[ind-1][1]
+        right_neighbor_freq = freq_groups[ind+1][1]
+        left_ratio = None if left_neighbor_freq == 0 or ind == 0 or freq == 0 else abs(left_neighbor_freq-freq)/min(left_neighbor_freq, freq)
+        right_ratio = None if right_neighbor_freq == 0 or ind == len(freq_groups)-1 or freq == 0 else abs(right_neighbor_freq-freq)/min(right_neighbor_freq, freq)
+
+        # if there's no note to group with on the right nor on the left, we zero this note
+        if (right_ratio == None or right_ratio > half_note_ratio) and (left_ratio == None or left_ratio > half_note_ratio):
+          freq_clusters.append((recurrence, 0))
+        else:
+          if left_ratio == None: # if the left note doesn't work, we group it with the right note
+            freq_clusters.append((recurrence, right_neighbor_freq))
+          elif right_ratio == None: #if the right_note doesn't work, we group it with the left one
+            freq_clusters.append((recurrence, left_neighbor_freq))
+          else: #if both of left and right ratio are defined, we group it with the closer one
+            freq_clusters.append((recurrence, right_neighbor_freq if right_ratio < left_ratio else left_neighbor_freq))
+      else:
+        freq_clusters.append(val)
+    
+    # generate the full frequency list again from the cluster
+    final_freq_list = []
+    for recurrence, freq in freq_clusters:
+      for i in range(recurrence):
+        final_freq_list.append(freq)
+    final_freq_list = np.array(final_freq_list)
+
+    if(self.plot):
+      # plot the filtered frequencies
+      plt.scatter(time, final_freq_list)
+      plt.title("Most Prominent Frequency over time after Clustering")
+      plt.xlabel("Time (s)")
+      plt.ylabel("Frequency (Hz)")
+      plt.ylim([0, self.upperFreq])
+      self.save_plot_with_name("freq_over_time_clustered")
+      plt.clf()
+
+    return final_freq_list, filtered_magn
 
 
   # output the audio file in the following format:
@@ -183,29 +251,23 @@ class FrequencyToCode():
     f.close()
 
 ######################################################
-'''
-path = os.path.abspath("./audio/test4.wav")
-extractor = MainNotesExtractor(path, 1)
-freqs, magn, time = extractor.extract()
-encoder = FrequencyToCode(freqs, time)
-encoder.writeCode()
-'''
 
-parser = OptionParser()
-parser.add_option("-p", "--plot", dest="plot", action="store_true",
-                  help="create plots under /graphs", metavar="GRAPHS", default=False)
-parser.add_option("-f", "--file",
-                  dest="audiofile", default="./audio/test4.wav",
-                  help="path to wav file")
+# main routine
+def main():
+  parser = OptionParser()
+  parser.add_option("-p", "--plot", dest="plot", action="store_true",
+                    help="create plots under /graphs", metavar="GRAPHS", default=False)
+  parser.add_option("-f", "--file",
+                    dest="audiofile", default="./audio/test4.wav",
+                    help="path to wav file")
 
-(options, _) = parser.parse_args()
-fname = options.audiofile
-path = os.path.abspath(fname)
-extractor = MainNotesExtractor(path, 1)
-freqs, magn, time = extractor.extract()
-encoder = FrequencyToCode(freqs, time)
-encoder.writeCode()
+  (options, _) = parser.parse_args()
+  fname = options.audiofile
+  path = os.path.abspath(fname)
+  extractor = MainNotesExtractor(path, 1, options.plot)
+  freqs, magn, time = extractor.extract()
+  encoder = FrequencyToCode(freqs, time)
+  encoder.writeCode()
 
-
-
-
+if __name__ == "__main__":
+  main()
