@@ -258,7 +258,7 @@ def main():
   parser.add_option("-p", "--plot", dest="plot", action="store_true",
                     help="create plots under /graphs", metavar="GRAPHS", default=False)
   parser.add_option("-f", "--file",
-                    dest="audiofile", default="./audio/test4.wav",
+                    dest="audiofile", default="./audio/test5.wav",
                     help="path to wav file")
 
   (options, _) = parser.parse_args()

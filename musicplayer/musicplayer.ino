@@ -1,6 +1,6 @@
 //Includes the Arduino Stepper Library
 #include <Stepper.h>
-#include "data.h"
+#include "odedata.h"
  
 // Defines the number of steps per rotation
 const int stepsPerRevolution = 512;
@@ -35,7 +35,7 @@ void loop() {
     const double halfNoteRatio = 1.05946309436;
     // go from 440 to 1760 Hz, one per each half note, each lasting 1 sec
     int speed = getSpeed(currentHz);
-    int steps = getStep(speed, 0.07);
+    int steps = getStep(speed, 0.5);
     myStepper.setSpeed(speed);
     myStepper.step(steps);
   }
