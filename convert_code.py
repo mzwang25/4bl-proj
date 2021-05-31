@@ -99,7 +99,7 @@ class MainNotesExtractor():
       plt.ylim([0, self.upperFreq])
       self.save_plot_with_name("raw_freq_over_time")
       plt.clf()
-      #plt.show()
+      #plt.show()n
     
     # plot the magnitude of the max frequency graph
     max_magn = np.array(max_magn)
@@ -210,7 +210,7 @@ class MainNotesExtractor():
       self.save_plot_with_name("freq_over_time_clustered")
       plt.clf()
 
-    return [i[0] for i in freq_clusters], filtered_magn, [i[1] for i in freq_clusters]
+    return [i[1] for i in freq_clusters], filtered_magn, [i[0] for i in freq_clusters]
 
 
   # output the audio file in the following format:
@@ -234,7 +234,7 @@ class FrequencyToCode():
     template += "float DURATION[]=^{}$;\nint LENGTH={};\n#endif\n"
 
     frequencies = str([float(i) for i in self.freqs])[1:-1]
-    duration = str([int(i) for i in self.time])[1:-1]
+    duration = str([float(i*0.07) for i in self.time])[1:-1]
     #duration = "0"
 
     if(len(frequencies) > 8000):
