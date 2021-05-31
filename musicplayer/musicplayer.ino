@@ -28,16 +28,18 @@ void loop() {
   if(counter >= LENGTH)
     counter = 0;
     
-  int currentHz = FREQUENCIES[counter++];
+  int currentHz = FREQUENCIES[counter];
   Serial.println(currentHz);
+  int currentDur = DURATION[counter];
+  Serial.println(currentDur);
+  counter++;
   
-  if(currentHz != 0) {  
-    const double halfNoteRatio = 1.05946309436;
+  //if(currentHz != 0) {  
+    // const double halfNoteRatio = 1.05946309436;
     // go from 440 to 1760 Hz, one per each half note, each lasting 1 sec
     int speed = getSpeed(currentHz);
-    int steps = getStep(speed, 0.5);
+    int steps = getStep(speed, currentDur);
     myStepper.setSpeed(speed);
     myStepper.step(steps);
-  }
-
+  //}
 }

@@ -194,16 +194,15 @@ class MainNotesExtractor():
       else:
         freq_clusters.append(val)
     
-    # generate the full frequency list again from the cluster
-    final_freq_list = []
-    for recurrence, freq in freq_clusters:
-      for i in range(recurrence):
-        final_freq_list.append(freq)
-    final_freq_list = np.array(final_freq_list)
-
     if(self.plot):
+      # generate the full frequency list again from the cluster
+      plot_freq_list = []
+      for recurrence, freq in freq_clusters:
+        for i in range(recurrence):
+          plot_freq_list.append(freq)
+      plot_freq_list = np.array(plot_freq_list)
       # plot the filtered frequencies
-      plt.scatter(time, final_freq_list)
+      plt.scatter(time, plot_freq_list)
       plt.title("Most Prominent Frequency over time after Clustering")
       plt.xlabel("Time (s)")
       plt.ylabel("Frequency (Hz)")
@@ -211,7 +210,7 @@ class MainNotesExtractor():
       self.save_plot_with_name("freq_over_time_clustered")
       plt.clf()
 
-    return final_freq_list, filtered_magn
+    return [i[0] for i in freq_clusters], filtered_magn, [i[1] for i in freq_clusters]
 
 
   # output the audio file in the following format:
@@ -219,9 +218,9 @@ class MainNotesExtractor():
   def extract(self):
     # generate and extract data from spectrogram
     freqs, magn, time = self.get_top_freq_per_seg()
-    filtered_freqs, filtered_magn = self.clean_frequencies(freqs, magn, time)
+    filtered_freqs, filtered_magn, clustered_time = self.clean_frequencies(freqs, magn, time)
     #self.movingAverage(filtered_freqs)
-    return filtered_freqs, filtered_magn, time
+    return filtered_freqs, filtered_magn, clustered_time
     # get rid of the noise (frequencies with small magnitude in fft)
 
 
@@ -236,7 +235,7 @@ class FrequencyToCode():
 
     frequencies = str([float(i) for i in self.freqs])[1:-1]
     duration = str([int(i) for i in self.time])[1:-1]
-    duration = "0"
+    #duration = "0"
 
     if(len(frequencies) > 8000):
       frequencies = frequencies[0:8000]
