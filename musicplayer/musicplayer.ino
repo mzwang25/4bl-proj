@@ -7,7 +7,7 @@ const int stepsPerRevolution = 512;
  
 // Creates an instance of stepper class
 // Pins entered in sequence IN1-IN3-IN2-IN4 for proper step sequence
-Stepper myStepper = Stepper(stepsPerRevolution, 8, 10, 9, 11);
+Stepper myStepper = Stepper(stepsPerRevolution, 8, 9, 10, 11);
  
 void setup() {
   // Nothing to do (Stepper Library sets pins as outputs)
@@ -30,9 +30,12 @@ void loop() {
     
   int currentHz = FREQUENCIES[counter];
   Serial.println(currentHz);
-  int currentDur = DURATION[counter];
+  float currentDur = DURATION[counter];
   Serial.println(currentDur);
   counter++;
+
+   if(currentDur == 0.5)
+    currentDur = 1;
   
   //if(currentHz != 0) {  
     // const double halfNoteRatio = 1.05946309436;
@@ -42,4 +45,5 @@ void loop() {
     myStepper.setSpeed(speed);
     myStepper.step(steps);
   //}
+  delay(100);
 }
